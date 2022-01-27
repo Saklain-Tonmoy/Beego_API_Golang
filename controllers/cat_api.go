@@ -4,11 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-
-	//"log"
+	"log"
 	"net/http"
 
-	"github.com/beego/beego/v2/client/httplib"
 	beego "github.com/beego/beego/v2/server/web"
 )
 
@@ -18,6 +16,22 @@ type CatApiController struct {
 
 type Image struct {
 	Url string `json:"url"`
+}
+
+func FetchApi(url string, ch chan string) {
+
+	request, err := http.NewRequest("GET", url, nil)
+
+	if err != nil {
+		log.Fatalln(err)
+	}
+
+	response, _ := http.DefaultClient.Do(request)
+
+	data, _ := ioutil.ReadAll(response.Body)
+
+	ch <- string(data)
+
 }
 
 func (c *CatApiController) Index() {
@@ -34,64 +48,47 @@ func (c *CatApiController) Index() {
 	type HomeRouteData struct {
 		Breed    []Breed
 		Category []Category
-		Image []Image
+		Image    []Image
 	}
+
+
+	breedChannel := make(chan string)
+	categoryChannel := make(chan string)
+	imageChannel := make(chan string)
+
+	go FetchApi("https://api.thecatapi.com/v1/breeds", breedChannel)
+
+	go FetchApi("https://api.thecatapi.com/v1/categories", categoryChannel)
+
+	go FetchApi("https://api.thecatapi.com/v1/images/search?limit=9", imageChannel)
+
+	breeds := []Breed{}
+	json.Unmarshal([]byte(<-breedChannel), &breeds)
+	//fmt.Println(breed)
+
+	categories := []Category{}
+	json.Unmarshal([]byte(<-categoryChannel), &categories)
+	//fmt.Println(category)
+
+	images := []Image{}
+	json.Unmarshal([]byte(<-imageChannel), &images)
+	//fmt.Println(image)
+
+	close(breedChannel)
+	close(categoryChannel)
+	close(imageChannel)
 
 	c.TplName = "index.tpl"
 
-	/// codes for fetching all the breeds from CAT API
-	/// using the "net/http" package of Golang
-	breed_url := "https://api.thecatapi.com/v1/breeds?attach_breed=0"
-
-	breed_req, _ := http.NewRequest("GET", breed_url, nil)
-
-	breed_req.Header.Add("x-api-key", "6c73dbb1-628c-4102-b72a-cb021e2368c5")
-
-	res, _ := http.DefaultClient.Do(breed_req)
-
-	breed_data, _ := ioutil.ReadAll(res.Body)
-
-	breed := []Breed{}
-
-	json.Unmarshal(breed_data, &breed)
-
-	/// codes for fetching all the categories from CAT API
-	/// using the "httplib" package of Beego
-	category_url := "https://api.thecatapi.com/v1/categories"
-	catReq := httplib.Get(category_url)
-
-	catReq.Header("Accept", "application/json")
-	catReq.Header("x-api-key", "6c73dbb1-628c-4102-b72a-cb021e2368c5")
-
-	category_data, _ := catReq.String()
-
-	category := []Category{}
-
-	json.Unmarshal([]byte(category_data), &category)
-
-	fmt.Println(category)
+	c.Data["breeds"] = breeds
+	c.Data["categories"] = categories
+	c.Data["images"] = images
 
 
-	/// codes for fetching initial images
-
-	imageReq := httplib.Get("https://api.thecatapi.com/v1/images/search?limit=9")
-
-	imageReq.Header("x-api-key", "6c73dbb1-628c-4102-b72a-cb021e2368c5")
-
-	imagesData, _ := imageReq.String()
-
-	images := []Image{}
-
-	json.Unmarshal([]byte(imagesData), &images)
-
-	fmt.Println(images)
-
-
-	/// forming data in structued way for serving in JSON Format
 	data := HomeRouteData{}
 
-	data.Breed = breed
-	data.Category = category
+	data.Breed = breeds
+	data.Category = categories
 	data.Image = images
 
 	c.Data["json"] = &data
@@ -107,8 +104,9 @@ func (c *CatApiController) GetImages() {
 	category := c.GetString("category_ids")
 	breed := c.GetString("breed_id")
 	limit := c.GetString("limit")
+	page := c.GetString("page")
 
-	images_url := "https://api.thecatapi.com/v1/images/search?order=" + order + "&limit=" + limit + "&category_ids=" + category + "&breed_id=" + breed + "&mime_types=" + mime_types
+	images_url := "https://api.thecatapi.com/v1/images/search?order=" + order + "&limit=" + limit + "&category_ids=" + category + "&breed_id=" + breed + "&mime_types=" + mime_types + "&page=" + page
 	fmt.Println(images_url)
 
 	req, _ := http.NewRequest("GET", images_url, nil)
@@ -122,7 +120,7 @@ func (c *CatApiController) GetImages() {
 	json.Unmarshal(images_data, &images)
 
 	c.Data["json"] = &images
-	
+
 	c.ServeJSON()
-	
+
 }
