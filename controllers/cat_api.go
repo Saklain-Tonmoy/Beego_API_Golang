@@ -64,6 +64,8 @@ func (c *CatApiController) Index() {
 
 	breeds := []Breed{}
 	json.Unmarshal([]byte(<-breedChannel), &breeds)
+	test_file, _ := json.Marshal(breeds)
+	_ = ioutil.WriteFile("test-breeds.json", test_file, 0644)
 	//fmt.Println(breed)
 
 	categories := []Category{}
@@ -90,6 +92,11 @@ func (c *CatApiController) Index() {
 	data.Breed = breeds
 	data.Category = categories
 	data.Image = images
+
+	file, _ := json.MarshalIndent(data, "", " ")
+	_ = ioutil.WriteFile("data.json", file, 0644)
+
+
 
 	c.Data["json"] = &data
 
