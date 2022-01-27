@@ -93,7 +93,7 @@ func (c *CatApiController) Index() {
 
 	c.Data["json"] = &data
 
-	c.ServeJSON()
+	defer c.ServeJSON()
 
 }
 
@@ -109,18 +109,16 @@ func (c *CatApiController) GetImages() {
 	images_url := "https://api.thecatapi.com/v1/images/search?order=" + order + "&limit=" + limit + "&category_ids=" + category + "&breed_id=" + breed + "&mime_types=" + mime_types + "&page=" + page
 	fmt.Println(images_url)
 
-	req, _ := http.NewRequest("GET", images_url, nil)
+	imagesChannel := make(chan string)
 
-	res, _ := http.DefaultClient.Do(req)
-
-	images_data, _ := ioutil.ReadAll(res.Body)
+	go FetchApi(images_url, imagesChannel)
 
 	images := []Image{}
 
-	json.Unmarshal(images_data, &images)
+	json.Unmarshal([]byte(<-imagesChannel), &images)
 
 	c.Data["json"] = &images
 
-	c.ServeJSON()
+	defer c.ServeJSON()
 
 }
